@@ -32,25 +32,26 @@ Vector3 MakeTransform(const Vector3& vector, const Matrix4x4& matrix)
 	return resultVector;
 }
 
+void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
+{
+	const float kGridHalfWidth = 2.0f;                                       // Gridの半分の幅
+	const uint32_t kSubdivision = 10;                                        // 分割数
+	const float kGridEvery = (kGridHalfWidth * 2.0f) / float(kSubdivision);  // 1つ分の長さ
+	
+	// 奥から手前への線を順々に引いていく
+	for (uint32_t xIndex = 0; xIndex <= kSubdivision; ++xIndex) {
+
+		Vector3 startPosition{ 0.0f,0.0f,-2.0f };
+
+		Vector3 endPosition{ 0.0f,0.0f,2.0f };
+	}
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// ライブラリの初期化
 	Novice::Initialize(kWindowTitle, 1280, 720);
-
-	Vector3 v1{ 1.2f,-3.9f,2.5f };
-
-	Vector3 v2{ 2.8f,0.4f,-1.3f };
-
-	Vector3 cross = Cross(v1, v2);
-
-	Vector3 cameraPosition{ 0.0f,0.0f,-10.0f };
-
-	Vector3 rotate{};
-
-	Vector3 translate{};
-
-	Vector3 kLocalVertices[3]{ {0.0f,-50.0f,0.0f},{50.0f,50.0f,0.0f},{-50.0f,50.0f,0.0f} };
 
 	// キー入力結果を受け取る箱
 	char keys[256] = {0};
@@ -69,49 +70,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-		rotate.y += 0.04f;
-
-		if (keys[DIK_A])
-		{
-			translate.x += 1.0f;
-		}
-
-		if (keys[DIK_D])
-		{
-			translate.x -= 1.0f;
-		}
-
-		if (keys[DIK_W])
-		{
-			translate.z -= 1.0f;
-		}
-
-		if (keys[DIK_S])
-		{
-			translate.z += 1.0f;
-		}
-
-		Matrix4x4 worldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, rotate, translate);
-
-		Matrix4x4 cameraMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f, 1.0f,1.0f }, { 0.0f,0.0f,0.0f }, cameraPosition);
-
-		Matrix4x4 viewMatrix = MatrixFunction::Inverse(cameraMatrix);
-
-		Matrix4x4 projectionMatrix = MatrixFunction::MakePerspectiveFovMatrix(0.45f, 1280.0f / 720.0f, 0.1f, 100.f);
-
-		Matrix4x4 worldViewProjectionMatrix = MatrixFunction::Multiply(viewMatrix, projectionMatrix);
-
-		worldViewProjectionMatrix = MatrixFunction::Multiply(worldMatrix, worldViewProjectionMatrix);
-
-		Matrix4x4 viewportMatrix = MatrixFunction::MakeViewportMatrix(0, 0, 1280.0f, 720.0f, 0.0f, 1.0f);
-
-		Vector3 screenVertices[3];
-
-		for (uint32_t i = 0; i < 3; ++i)
-		{
-			Vector3 ndcVertex = MakeTransform(kLocalVertices[i], worldViewProjectionMatrix);
-			screenVertices[i] = MakeTransform(ndcVertex, viewportMatrix);
-		}
+	
 
 		///
 		/// ↑更新処理ここまで
@@ -121,7 +80,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		Novice::DrawTriangle(int(screenVertices[0].x), int(screenVertices[0].y), int(screenVertices[1].x), int(screenVertices[1].y), int(screenVertices[2].x), int(screenVertices[2].y), RED, kFillModeSolid);
+		
 
 		///
 		/// ↑描画処理ここまで
