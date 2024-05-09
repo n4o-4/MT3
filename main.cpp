@@ -32,6 +32,11 @@ Vector3 MakeTransform(const Vector3& vector, const Matrix4x4& matrix)
 	return resultVector;
 }
 
+struct Sphere {
+	Vector3 center;
+	float radius;
+};
+
 void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
 {
 	const float kGridHalfWidth = 2.0f;                                       // Gridの半分の幅
@@ -41,10 +46,20 @@ void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMa
 	// 奥から手前への線を順々に引いていく
 	for (uint32_t xIndex = 0; xIndex <= kSubdivision; ++xIndex) {
 
-		Vector3 startPosition{ 0.0f,0.0f,-2.0f };
+		Vector3 startPosition{ xIndex * kGridEvery,0.0,2.0f };
 
-		Vector3 endPosition{ 0.0f,0.0f,2.0f };
+		Vector3 endPosition{ xIndex * (kGridEvery * 1),0.0f,-2.0f };
+
+		Vector3 ndcStartVertex = MakeTransform(startPosition,)
+
+		Vector3 screenVertices;
 	}
+}
+
+void DrawSphere(const Sphere* sphere, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+	const uint32_t kSubdivisiont = 6;
+
 }
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -70,7 +85,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-	
+		Matrix4x4 worldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, rotate, translate);
+
+		Matrix4x4 cameraMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f, 1.0f,1.0f }, { 0.0f,0.0f,0.0f }, cameraPosition);
+
+		Matrix4x4 viewMatrix = MatrixFunction::Inverse(cameraMatrix);
+
+		Matrix4x4 projectionMatrix = MatrixFunction::MakePerspectiveFovMatrix(0.45f, 1280.0f / 720.0f, 0.1f, 100.f);
+
+		Matrix4x4 worldViewProjectionMatrix = MatrixFunction::Multiply(viewMatrix, projectionMatrix);
+
+		worldViewProjectionMatrix = MatrixFunction::Multiply(worldMatrix, worldViewProjectionMatrix);
+
+		Matrix4x4 viewportMatrix = MatrixFunction::MakeViewportMatrix(0, 0, 1280.0f, 720.0f, 0.0f, 1.0f);
 
 		///
 		/// ↑更新処理ここまで
