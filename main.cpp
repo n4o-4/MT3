@@ -7,6 +7,26 @@
 
 const char kWindowTitle[] = "LC1C_25_ミヤモト_ナオヤ_ゲームタイトル";
 
+struct Sphere {
+	Vector3 center;
+	float radius;
+};
+
+struct Line {
+	Vector3 origin; //!< 始点
+	Vector3 diff;   //!< 終点への差分ベクトル
+};
+
+struct Ray {
+	Vector3 origin; //!< 始点
+	Vector3 diff;   //!< 終点への差分ベクトル
+};
+
+struct Segment {
+	Vector3 origin; //!< 始点
+	Vector3 diff;   //!< 終点への差分ベクトル
+};
+
 Vector3 Cross(const Vector3& v1, const Vector3& v2) {
 
 	Vector3 result;
@@ -32,11 +52,6 @@ Vector3 MakeTransform(const Vector3& vector, const Matrix4x4& matrix)
 
 	return resultVector;
 }
-
-struct Sphere {
-	Vector3 center;
-	float radius;
-};
 
 void DrawGrid( Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
 {
@@ -91,7 +106,7 @@ void DrawGrid( Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
 	}
 }
 
-void DrawSphere(const Sphere* sphere, Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
+void DrawSphere(const Sphere* sphere, Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, int color)
 {
 	const uint32_t kSubdivisiont = 12;  // 分割数
 
@@ -142,10 +157,38 @@ void DrawSphere(const Sphere* sphere, Matrix4x4& viewProjectionMatrix, const Mat
 			Vector3 screenCVertex = MakeTransform(ndcCVertex, viewportMatrix);
 
 			// ab,ac で線を引く
-			Novice::DrawLine(int(screenAVertex.x), int(screenAVertex.y), int(screenBVertex.x), int(screenBVertex.y), 0xAAAAAAFF);
-			Novice::DrawLine(int(screenAVertex.x), int(screenAVertex.y), int(screenCVertex.x), int(screenCVertex.y), 0xAAAAAAFF);
+			Novice::DrawLine(int(screenAVertex.x), int(screenAVertex.y), int(screenBVertex.x), int(screenBVertex.y), color);
+			Novice::DrawLine(int(screenAVertex.x), int(screenAVertex.y), int(screenCVertex.x), int(screenCVertex.y), color);
 		}
 	}
+}
+
+Vector3 Project(const Vector3& v1, const Vector3& v2)
+{
+	float k = sqrtf(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
+
+	// Vector v2 を正規化
+	Vector3 normalizeV2 = { v2.x / k,v2.y / k,v2.z / k };
+
+	// VectorV1とNormalizeV2の内積
+	float innerProduct = v1.x * normalizeV2.x + v1.y * normalizeV2.y + v1.z * normalizeV2.z;
+
+	Vector3 ProjectVector = { innerProduct * normalizeV2.x,innerProduct * normalizeV2.y,innerProduct * normalizeV2.z };
+
+	return ProjectVector;
+}
+
+Vector3 ClosestPoint(const Vector3& point, const Segment& segment)
+{
+	float k = sqrtf(segment.diff.x * segment.diff.x + segment.diff.y * segment.diff.y + segment.diff.z * segment.diff.z);
+
+	Vector3 normalizeDiff = { segment.diff.x / k,segment.diff.y / k,segment.diff.z / k };
+
+	float innerProduct = (point.x - segment.origin.x) * normalizeDiff.x + (point.y - segment.origin.y) * normalizeDiff.y + (point.z - segment.origin.z) * normalizeDiff.z;
+
+	Vector3 ProjectVector = { innerProduct * normalizeDiff.x + segment.origin.x,innerProduct * normalizeDiff.y + segment.origin.y,innerProduct * normalizeDiff.z + segment.origin.z};
+
+	return ProjectVector;
 }
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -158,12 +201,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Vector3 cameraRotate{ 0.26F,0.0F,0.0F };
 
-	Sphere sphere = {
-		{0,0,0},
-		1.0f,
-	};
+	Segment segment{ {-2.0f,-1.0f,0.0f},{3.0f,2.0f,2.0f} };
 
-	
+	Vector3 point{ -1.5f,0.6f,0.6f };
+
+	Sphere pointSphere{ point,0.01f };
+
+	Vector3 project = Project({ point.x - segment.origin.x,point.y - segment.origin.y,point.z - segment.origin.z }, segment.diff);
+
+	Vector3 closestPoint = ClosestPoint(point, segment);
+
+	Sphere closestPointSphere{ closestPoint,0.01f };
 
 	// キー入力結果を受け取る箱
 	char keys[256] = {0};
@@ -182,13 +230,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-		ImGui::Begin("Window");
-		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
-		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("SphereCenter", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("CameraTranslate", &sphere.radius, 0.01f);
-		ImGui::End();
-
 		Matrix4x4 cameraMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f, 1.0f,1.0f }, cameraRotate, cameraTranslate);
 
 		Matrix4x4 viewMatrix = MatrixFunction::Inverse(cameraMatrix);
@@ -199,6 +240,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		Matrix4x4 viewProjectionMatrix = MatrixFunction::Multiply(viewMatrix, projectionMatrix);
 
+		/////// 線分
+
+		//ワールド座標系
+		Matrix4x4 startWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, segment.origin);
+		Matrix4x4 endWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, {segment.origin.x + segment.diff.x,segment.origin.y + segment.diff.y ,segment.origin.z + segment.diff.z });
+
+		// 同時クリップ空間
+		Matrix4x4 startWorldViewProjectionMatrix = MatrixFunction::Multiply(startWorldMatrix, viewProjectionMatrix);
+		Matrix4x4 endWorldViewProjectionMatrix = MatrixFunction::Multiply(endWorldMatrix, viewProjectionMatrix);
+
+		// 正規化デバイス座標系
+		Vector3 ndcStartVertex = MakeTransform({ 0,0,0 }, startWorldViewProjectionMatrix);
+		Vector3 ndcEndVertex = MakeTransform({ 0,0,0 }, endWorldViewProjectionMatrix);
+
+		// スクリーン座標系
+		Vector3 screenStartVertex = MakeTransform(ndcStartVertex, viewportMatrix);
+		Vector3 screenEndVertex = MakeTransform(ndcEndVertex, viewportMatrix);
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -207,11 +266,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		
+		ImGui::Begin("Window");
+		ImGui::InputFloat3("Project", &project.x, "%.3f", ImGuiInputTextFlags_ReadOnly);
+		ImGui::End();
 
+		// グリッド表示
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		DrawSphere(&sphere, viewProjectionMatrix, viewportMatrix);
+		// 線分表示
+		Novice::DrawLine(int(screenStartVertex.x), int(screenStartVertex.y), int(screenEndVertex.x), int(screenEndVertex.y), WHITE);
+
+		// PointSphereを表示
+		DrawSphere(&pointSphere, viewProjectionMatrix, viewportMatrix,0xff0000ff);
+
+		// ClosestSphereを表示
+		DrawSphere(&closestPointSphere, viewProjectionMatrix, viewportMatrix, 0x000000ff);
 
 		///
 		/// ↑描画処理ここまで
