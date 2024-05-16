@@ -91,7 +91,7 @@ void DrawGrid( Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
 	}
 }
 
-void DrawSphere(const Sphere* sphere, Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
+void DrawSphere(const Sphere* sphere, Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix,int color)
 {
 	const uint32_t kSubdivisiont = 12;  // 分割数
 
@@ -142,9 +142,27 @@ void DrawSphere(const Sphere* sphere, Matrix4x4& viewProjectionMatrix, const Mat
 			Vector3 screenCVertex = MakeTransform(ndcCVertex, viewportMatrix);
 
 			// ab,ac で線を引く
-			Novice::DrawLine(int(screenAVertex.x), int(screenAVertex.y), int(screenBVertex.x), int(screenBVertex.y), 0xAAAAAAFF);
-			Novice::DrawLine(int(screenAVertex.x), int(screenAVertex.y), int(screenCVertex.x), int(screenCVertex.y), 0xAAAAAAFF);
+			Novice::DrawLine(int(screenAVertex.x), int(screenAVertex.y), int(screenBVertex.x), int(screenBVertex.y), color);
+			Novice::DrawLine(int(screenAVertex.x), int(screenAVertex.y), int(screenCVertex.x), int(screenCVertex.y), color);
 		}
+	}
+}
+
+bool IsCollision(const Sphere& s1, const Sphere& s2)
+{
+	float distance = sqrtf(float(pow(s1.center.x - s2.center.x, 2.0f)) + float(pow(s1.center.y - s2.center.y, 2.0f)) + float(pow(s1.center.z - s2.center.z, 2.0f)));
+
+	if (distance <= s1.radius + s2.radius)
+	{
+		return true;
+	} 
+	else if(distance > s1.radius + s2.radius)
+	{
+		return false;
+	}
+	else
+	{
+		return false;
 	}
 }
 
@@ -158,12 +176,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Vector3 cameraRotate{ 0.26F,0.0F,0.0F };
 
-	Sphere sphere = {
-		{0,0,0},
-		1.0f,
-	};
+	int sphere0Color = WHITE;
 
-	
+	int sphere1Color = WHITE;
+
+	Sphere sphere[2] = {};
 
 	// キー入力結果を受け取る箱
 	char keys[256] = {0};
@@ -182,12 +199,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓更新処理ここから
 		///
 
-		ImGui::Begin("Window");
-		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
-		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("SphereCenter", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("CameraTranslate", &sphere.radius, 0.01f);
-		ImGui::End();
+		if (IsCollision(sphere[0], sphere[1]))
+		{
+			sphere0Color = RED;
+			sphere1Color = BLUE;
+		}
+		if (!IsCollision(sphere[0], sphere[1]))
+		{
+			sphere0Color = WHITE;
+			sphere1Color = WHITE;
+		}
 
 		Matrix4x4 cameraMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f, 1.0f,1.0f }, cameraRotate, cameraTranslate);
 
@@ -199,6 +220,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		Matrix4x4 viewProjectionMatrix = MatrixFunction::Multiply(viewMatrix, projectionMatrix);
 
+		
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -207,11 +230,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		/// ↓描画処理ここから
 		///
 
-		
+		ImGui::Begin("Window");
+		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
+		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
+		ImGui::DragFloat3("SphereCenter[0]", &sphere[0].center.x, 0.01f);
+		ImGui::DragFloat("Cameraradius[0]", &sphere[0].radius, 0.01f);
+		ImGui::DragFloat3("SphereCenter[1]", &sphere[1].center.x, 0.01f);
+		ImGui::DragFloat("Cameraradius[1]", &sphere[1].radius, 0.01f);
+		ImGui::End();
 
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		DrawSphere(&sphere, viewProjectionMatrix, viewportMatrix);
+		DrawSphere(&sphere[0], viewProjectionMatrix, viewportMatrix,sphere0Color);
+
+		DrawSphere(&sphere[1], viewProjectionMatrix, viewportMatrix,sphere1Color);
 
 		///
 		/// ↑描画処理ここまで
