@@ -89,6 +89,17 @@ float Absolute(float x) {
 	return x;
 }
 
+Vector3 Cross(const Vector3& v1, const Vector3& v2) {
+
+	Vector3 result;
+
+	result.x = v1.y * v2.z - v1.z * v2.y;
+	result.y = v1.z * v2.x - v1.x * v2.z;
+	result.z = v1.x * v2.y - v1.y * v2.x;
+
+	return result;
+}
+
 struct Sphere {
 	Vector3 center;
 	float radius;
@@ -100,16 +111,14 @@ struct Plane {
 	float distance; //!< 距離
 };
 
-Vector3 Cross(const Vector3& v1, const Vector3& v2) {
+struct Segment {
+	Vector3 origin; //!< 始点
+	Vector3 diff;   //!< 終点への差分ベクトル
+};
 
-	Vector3 result;
-
-	result.x = v1.y * v2.z - v1.z * v2.y;
-	result.y = v1.z * v2.x - v1.x * v2.z;
-	result.z = v1.x * v2.y - v1.y * v2.x;
-
-	return result;
-}
+struct Triangle {
+	Vector3 vertices[3];
+};
 
 void DrawGrid( Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
 {
@@ -243,6 +252,25 @@ void DarwPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const 
 	Novice::DrawLine(static_cast<int>(points[2].x), static_cast<int>(points[2].y), static_cast<int>(points[0].x), static_cast<int>(points[0].y), color);
 }
 
+void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+
+	Vector3 origin = MakeTransform(MakeTransform(segment.origin, viewProjectionMatrix), viewportMatrix);
+	Vector3 end = MakeTransform(MakeTransform(Add(segment.origin,segment.diff), viewProjectionMatrix), viewportMatrix);
+
+	Novice::DrawLine(static_cast<int>(origin.x), static_cast<int>(origin.y), static_cast<int>(end.x), static_cast<int>(end.y), color);
+}
+
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix) {
+	Vector3 screenVertices[3];
+	for (int i = 0; i < 3; i++) {
+		screenVertices[i] = MakeTransform(MakeTransform(triangle.vertices[i], viewProjectionMatrix), viewportMatrix);
+	}
+
+	Novice::DrawTriangle(static_cast<int>(screenVertices[0].x), static_cast<int>(screenVertices[0].y),
+		static_cast<int>(screenVertices[1].x), static_cast<int>(screenVertices[1].y),
+		static_cast<int>(screenVertices[1].x), static_cast<int>(screenVertices[1].y), WHITE, kFillModeWireFrame);
+}
+
 bool IsCollision(const Sphere& s1, const Sphere& s2)
 {
 	float distance = sqrtf(float(pow(s1.center.x - s2.center.x, 2.0f)) + float(pow(s1.center.y - s2.center.y, 2.0f)) + float(pow(s1.center.z - s2.center.z, 2.0f)));
@@ -277,6 +305,23 @@ bool SpherePlaneCollision( Sphere& sphere, const Plane& plane) {
 	}
 }
 
+bool segmentPlaneCollision(const Segment& segment, const Plane& plane) {
+	float dot = Dot(plane.normal, segment.diff);
+
+	if (dot == 0.0f) {
+		return false;
+	}
+
+	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
+
+	if (0 <= t && t <= 1) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -288,6 +333,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 cameraRotate{ 0.26F,0.0F,0.0F };
 	
 	Sphere sphere = {};
+
+	uint32_t segmentcolor = WHITE;;
+
+	Segment segment = {};
 
 	Plane plane = { {0.0f,0.0f,1.0f} ,0.0f};
 
@@ -318,6 +367,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			plane.normal = Normalize(plane.normal); 
 		}
 		ImGui::DragFloat("Plane.distance", &plane.distance, 0.01f);
+		ImGui::DragFloat3("Segment.origin", &segment.origin.x,0.01f);
+		ImGui::DragFloat3("Segment.diff", &segment.diff.x,0.01f);
 		ImGui::End();
 		
 
@@ -331,11 +382,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		Matrix4x4 viewProjectionMatrix = MatrixFunction::Multiply(viewMatrix, projectionMatrix);
 
-		if (SpherePlaneCollision(sphere, plane)) {
-			sphere.color = RED;
+		if (segmentPlaneCollision(segment, plane))
+		{
+			segmentcolor = RED;
 		}
 		else {
-			sphere.color = WHITE;
+			segmentcolor = WHITE;
 		}
 
 		///
@@ -348,7 +400,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		DrawSphere(&sphere, viewProjectionMatrix, viewportMatrix);
+		DrawSegment(segment, viewProjectionMatrix, viewportMatrix, segmentcolor);
 
 		DarwPlane(plane, viewProjectionMatrix, viewportMatrix, WHITE);
 
