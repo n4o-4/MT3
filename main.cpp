@@ -260,7 +260,7 @@ void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, 
 	Novice::DrawLine(static_cast<int>(origin.x), static_cast<int>(origin.y), static_cast<int>(end.x), static_cast<int>(end.y), color);
 }
 
-void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix) {
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix,uint32_t color) {
 	Vector3 screenVertices[3];
 	for (int i = 0; i < 3; i++) {
 		screenVertices[i] = MakeTransform(MakeTransform(triangle.vertices[i], viewProjectionMatrix), viewportMatrix);
@@ -268,7 +268,7 @@ void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatri
 
 	Novice::DrawTriangle(static_cast<int>(screenVertices[0].x), static_cast<int>(screenVertices[0].y),
 		static_cast<int>(screenVertices[1].x), static_cast<int>(screenVertices[1].y),
-		static_cast<int>(screenVertices[1].x), static_cast<int>(screenVertices[1].y), WHITE, kFillModeWireFrame);
+		static_cast<int>(screenVertices[2].x), static_cast<int>(screenVertices[2].y), color, kFillModeWireFrame);
 }
 
 bool IsCollision(const Sphere& s1, const Sphere& s2)
@@ -331,14 +331,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Vector3 cameraTranslate{ 0.0f,1.9f,-6.49f };
 
 	Vector3 cameraRotate{ 0.26F,0.0F,0.0F };
-	
-	Sphere sphere = {};
 
 	uint32_t segmentcolor = WHITE;;
 
 	Segment segment = {};
 
-	Plane plane = { {0.0f,0.0f,1.0f} ,0.0f};
+	Triangle triangle{};
 
 	// キー入力結果を受け取る箱
 	char keys[256] = {0};
@@ -360,15 +358,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("SphereCenter[0]", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("Cameraradius[0]", &sphere.radius, 0.01f);
-		ImGui::DragFloat3("Plane.Normal", &plane.normal.x, 0.01f);
-		if(ImGui::IsItemEdited()){
-			plane.normal = Normalize(plane.normal); 
-		}
-		ImGui::DragFloat("Plane.distance", &plane.distance, 0.01f);
 		ImGui::DragFloat3("Segment.origin", &segment.origin.x,0.01f);
 		ImGui::DragFloat3("Segment.diff", &segment.diff.x,0.01f);
+		ImGui::DragFloat3("vertices[0]", &triangle.vertices[0].x, 0.01f);
+		ImGui::DragFloat3("vertices[1]", &triangle.vertices[1].x, 0.01f);
+		ImGui::DragFloat3("vertices[2]", &triangle.vertices[2].x, 0.01f);
 		ImGui::End();
 		
 
@@ -382,14 +376,51 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		Matrix4x4 viewProjectionMatrix = MatrixFunction::Multiply(viewMatrix, projectionMatrix);
 
-		if (segmentPlaneCollision(segment, plane))
+		Vector3 v1 = Subtract(triangle.vertices[1], triangle.vertices[0]);
+
+		Vector3 v2 = Subtract(triangle.vertices[2], triangle.vertices[1]);
+
+		Vector3 v = Cross(v1, v2);
+
+		v = Normalize(v);
+
+		float d = Dot(triangle.vertices[0], v);
+
+		Plane trianglePlane = { v,d };
+		
+		float DOT = Dot(trianglePlane.normal, segment.diff);
+
+		float T = (trianglePlane.distance - Dot(segment.origin, trianglePlane.normal)) / DOT;
+		
+		Vector3 p = Add(segment.origin, { segment.diff.x * T,segment.diff.y * T,segment.diff.z * T });
+
+		if (segmentPlaneCollision(segment, trianglePlane))
 		{
-			segmentcolor = RED;
+			Vector3 v01 = Subtract(triangle.vertices[0], triangle.vertices[1]);
+			Vector3 v12 = Subtract(triangle.vertices[1], triangle.vertices[2]);
+			Vector3 v20 = Subtract(triangle.vertices[2], triangle.vertices[0]);
+
+			Vector3 v0p = Subtract(triangle.vertices[0], p);
+			Vector3 v1p = Subtract(triangle.vertices[1], p);
+			Vector3 v2p = Subtract(triangle.vertices[2], p);
+
+			Vector3 cross01 = Cross(v01, v1p);
+			Vector3 cross12 = Cross(v12, v2p);
+			Vector3 cross20 = Cross(v20, v0p);
+
+			if (Dot(cross01, trianglePlane.normal) >= 0.0f &&
+				Dot(cross12, trianglePlane.normal) >= 0.0f &&
+				Dot(cross20, trianglePlane.normal) >= 0.0f) {
+				segmentcolor = RED;
+			}
+			else {
+				segmentcolor = WHITE;
+			}
 		}
 		else {
 			segmentcolor = WHITE;
 		}
-
+		
 		///
 		/// ↑更新処理ここまで
 		///
@@ -402,7 +433,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		DrawSegment(segment, viewProjectionMatrix, viewportMatrix, segmentcolor);
 
-		DarwPlane(plane, viewProjectionMatrix, viewportMatrix, WHITE);
+		DrawTriangle(triangle, viewProjectionMatrix, viewportMatrix,WHITE);
 
 		///
 		/// ↑描画処理ここまで
