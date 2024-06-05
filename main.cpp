@@ -95,6 +95,11 @@ float Absolute(float x) {
 	return x;
 }
 
+struct Segment {
+	Vector3 origin; //!< 始点
+	Vector3 diff;   //!< 終点への差分ベクトル
+};
+
 struct Sphere {
 	Vector3 center;
 	float radius;
@@ -254,6 +259,14 @@ void DarwPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const 
 	Novice::DrawLine(static_cast<int>(points[2].x), static_cast<int>(points[2].y), static_cast<int>(points[0].x), static_cast<int>(points[0].y), color);
 }
 
+void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+
+	Vector3 origin = MakeTransform(MakeTransform(segment.origin, viewProjectionMatrix), viewportMatrix);
+	Vector3 end = MakeTransform(MakeTransform(Add(segment.origin, segment.diff), viewProjectionMatrix), viewportMatrix);
+
+	Novice::DrawLine(static_cast<int>(origin.x), static_cast<int>(origin.y), static_cast<int>(end.x), static_cast<int>(end.y), color);
+}
+
 void DrawAABB(const AABB& aabb, Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportmatrx, uint32_t color)
 {
 	Vector3 minXYZ = aabb.min;
@@ -393,6 +406,40 @@ bool AABBSphereCollision(AABB& aabb, Sphere& sphere) {
 	}
 }
 
+bool AABBSegmentCollision(AABB aabb, Segment segment)
+{
+	float dotX = Dot({ 1,0,0 }, segment.diff);
+	float dotY = Dot({ 0,1,0 }, segment.diff);
+	float dotZ = Dot({ 0,0,1 }, segment.diff);
+
+	float txMin = (aabb.min.x - Dot(segment.origin, { 1,0,0 })) / dotX;
+	float txMax = (aabb.max.x - Dot(segment.origin, { 1,0,0 })) / dotX;
+
+	float tyMin = (aabb.min.y - Dot(segment.origin, { 0,1,0 })) / dotY;
+	float tyMax = (aabb.max.y - Dot(segment.origin, { 0,1,0 })) / dotY;
+
+	float tzMin = (aabb.min.z - Dot(segment.origin, { 0,0,1 })) / dotZ;
+	float tzMax = (aabb.max.z - Dot(segment.origin, { 0,0,1 })) / dotZ;
+
+	float tNearX = min(txMin, txMax);
+	float tFarX = max(txMin, txMax);
+	float tNearY = min(tyMin, tyMax);
+	float tFarY = max(tyMin, tyMax);
+	float tNearZ = min(tzMin, tzMax);
+	float tFarZ = max(tzMin, tzMax);
+
+	float tMin = max(max(tNearX, tNearY), tNearZ);
+
+	float tMax = min(min(tFarX, tFarY), tFarZ);
+
+	if (tMin <= tMax) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -405,7 +452,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	AABB aabb1 = {};
 
-	struct Sphere sphere = {};
+	Segment segment = {};
+
+	uint32_t segmentColor = WHITE;
 
 	uint32_t AABB1Color = WHITE;
 
@@ -431,8 +480,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
 		ImGui::DragFloat3("AABB1.min", &aabb1.min.x, 0.1f);
 		ImGui::DragFloat3("AABB1.max", &aabb1.max.x, 0.1f);
-		ImGui::DragFloat3("sphere.center", &sphere.center.x, 0.01f);
-		ImGui::DragFloat("sphere.radius", &sphere.radius, 0.01f);
+		ImGui::DragFloat3("segement.origin", &segment.origin.x, 0.01f);
+		ImGui::DragFloat3("segement.diff", &segment.diff.x, 0.01f);
 		ImGui::End();
 
 
@@ -446,11 +495,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		Matrix4x4 viewProjectionMatrix = MatrixFunction::Multiply(viewMatrix, projectionMatrix);
 
-		if (AABBSphereCollision(aabb1,sphere))
-		{
+		if (AABBSegmentCollision(aabb1, segment)) {
 			AABB1Color = RED;
 		}
-		else {
+		if (!AABBSegmentCollision(aabb1, segment)) {
 			AABB1Color = WHITE;
 		}
 
@@ -466,7 +514,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, AABB1Color);
 
-		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix);
+		DrawSegment(segment, viewProjectionMatrix, viewportMatrix, segmentColor);
 		
 		///
 		/// ↑描画処理ここまで
