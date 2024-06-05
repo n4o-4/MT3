@@ -405,7 +405,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	AABB aabb1 = {};
 
-	struct Sphere sphere = {};
+	Sphere sphere = {};
 
 	uint32_t AABB1Color = WHITE;
 
@@ -449,9 +449,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		if (AABBSphereCollision(aabb1,sphere))
 		{
 			AABB1Color = RED;
+			sphere.color = WHITE;
 		}
 		else {
 			AABB1Color = WHITE;
+			sphere.color = WHITE;
 		}
 
 		///
@@ -466,7 +468,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, AABB1Color);
 
-		DrawSphere(sphere, viewProjectionMatrix, viewportMatrix);
+		DrawSphere(&sphere, viewProjectionMatrix, viewportMatrix);
 		
 		///
 		/// ↑描画処理ここまで
