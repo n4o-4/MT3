@@ -89,17 +89,6 @@ float Absolute(float x) {
 	return x;
 }
 
-Vector3 Cross(const Vector3& v1, const Vector3& v2) {
-
-	Vector3 result;
-
-	result.x = v1.y * v2.z - v1.z * v2.y;
-	result.y = v1.z * v2.x - v1.x * v2.z;
-	result.z = v1.x * v2.y - v1.y * v2.x;
-
-	return result;
-}
-
 struct Sphere {
 	Vector3 center;
 	float radius;
@@ -111,16 +100,23 @@ struct Plane {
 	float distance; //!< 距離
 };
 
-struct Segment {
-	Vector3 origin; //!< 始点
-	Vector3 diff;   //!< 終点への差分ベクトル
+struct AABB {
+	Vector3 min; //!< 最小点
+	Vector3 max; //!< 最大点
 };
 
-struct Triangle {
-	Vector3 vertices[3];
-};
+Vector3 Cross(const Vector3& v1, const Vector3& v2) {
 
-void DrawGrid( Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
+	Vector3 result;
+
+	result.x = v1.y * v2.z - v1.z * v2.y;
+	result.y = v1.z * v2.x - v1.x * v2.z;
+	result.z = v1.x * v2.y - v1.y * v2.x;
+
+	return result;
+}
+
+void DrawGrid(Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
 {
 	const float kGridHalfWidth = 2.0f;                                       // Gridの半分の幅
 	const uint32_t kSubdivision = 10;                                        // 分割数
@@ -130,16 +126,16 @@ void DrawGrid( Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix)
 	for (uint32_t xIndex = 0; xIndex <= kSubdivision; ++xIndex) {
 
 		// ワールド座標系
-		Matrix4x4 startWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { (xIndex * kGridEvery),0.0f,kGridHalfWidth});
-		Matrix4x4 endWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { (xIndex * kGridEvery),0.0f,-kGridHalfWidth});
+		Matrix4x4 startWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { (xIndex * kGridEvery),0.0f,kGridHalfWidth });
+		Matrix4x4 endWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { (xIndex * kGridEvery),0.0f,-kGridHalfWidth });
 
 		// 同時クリップ空間
 		Matrix4x4 startWorldViewProjectionMatrix = MatrixFunction::Multiply(startWorldMatrix, viewProjectionMatrix);
 		Matrix4x4 endWorldViewProjectionMatrix = MatrixFunction::Multiply(endWorldMatrix, viewProjectionMatrix);
 
 		// 正規化デバイス座標系
-		Vector3 ndcStartVertex = MakeTransform({-2,0,0}, startWorldViewProjectionMatrix);
-		Vector3 ndcEndVertex = MakeTransform({-2,0,0}, endWorldViewProjectionMatrix);
+		Vector3 ndcStartVertex = MakeTransform({ -2,0,0 }, startWorldViewProjectionMatrix);
+		Vector3 ndcEndVertex = MakeTransform({ -2,0,0 }, endWorldViewProjectionMatrix);
 
 		// スクリーン座標系
 		Vector3 screenStartVertex = MakeTransform(ndcStartVertex, viewportMatrix);
@@ -191,9 +187,9 @@ void DrawSphere(const Sphere* sphere, Matrix4x4& viewProjectionMatrix, const Mat
 
 			Vector3 a, b, c;
 
-			a = { sphere->radius * cosf(lon) * cosf(lat) + sphere->center.x, 
+			a = { sphere->radius * cosf(lon) * cosf(lat) + sphere->center.x,
 				sphere->radius * sinf(lon) + sphere->center.y,
-				sphere->radius * cosf(lon) * sinf(lat)+ sphere->center.z };
+				sphere->radius * cosf(lon) * sinf(lat) + sphere->center.z };
 
 			b = { sphere->radius * cosf(lon + kLonEvery) * cosf(lat) + sphere->center.x,
 				sphere->radius * sinf(lon + kLonEvery) + sphere->center.y,
@@ -252,23 +248,84 @@ void DarwPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const 
 	Novice::DrawLine(static_cast<int>(points[2].x), static_cast<int>(points[2].y), static_cast<int>(points[0].x), static_cast<int>(points[0].y), color);
 }
 
-void DrawSegment(const Segment& segment, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color) {
+void DrawAABB(const AABB& aabb, Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportmatrx, uint32_t color)
+{
+	Vector3 minXYZ = aabb.min;
+	Vector3 minXYmaxZ = { aabb.min.x,aabb.min.y,aabb.max.z };
+	Vector3 minYZmaxX = { aabb.max.x,aabb.min.y,aabb.min.z };
+	Vector3 minYmaxXZ = { aabb.max.x,aabb.min.y,aabb.max.z };
 
-	Vector3 origin = MakeTransform(MakeTransform(segment.origin, viewProjectionMatrix), viewportMatrix);
-	Vector3 end = MakeTransform(MakeTransform(Add(segment.origin,segment.diff), viewProjectionMatrix), viewportMatrix);
+	// ワールド座標系
+	Matrix4x4 minXYZWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, minXYZ);
+	Matrix4x4 minXYmaxZWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, minXYmaxZ);
+	Matrix4x4 minYZmaxXWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, minYZmaxX);
+	Matrix4x4 minYmaxXZWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, minYmaxXZ);
 
-	Novice::DrawLine(static_cast<int>(origin.x), static_cast<int>(origin.y), static_cast<int>(end.x), static_cast<int>(end.y), color);
-}
+	// 同時クリップ空間
+	Matrix4x4 minXYZWorldViewProjectionMatrix = MatrixFunction::Multiply(minXYZWorldMatrix, viewProjectionMatrix);
+	Matrix4x4 minXYmaxZWorldViewProjectionMatrix = MatrixFunction::Multiply(minXYmaxZWorldMatrix, viewProjectionMatrix);
+	Matrix4x4 minYZmaxXWorldViewProjectionMatrix = MatrixFunction::Multiply(minYZmaxXWorldMatrix, viewProjectionMatrix);
+	Matrix4x4 minYmaxXZWorldViewProjectionMatrix = MatrixFunction::Multiply(minYmaxXZWorldMatrix, viewProjectionMatrix);
 
-void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix,uint32_t color) {
-	Vector3 screenVertices[3];
-	for (int i = 0; i < 3; i++) {
-		screenVertices[i] = MakeTransform(MakeTransform(triangle.vertices[i], viewProjectionMatrix), viewportMatrix);
-	}
+	// 正規化デバイス座標系
+	Vector3 ndcminXYZVertex = MakeTransform({ 0,0,0 }, minXYZWorldViewProjectionMatrix);
+	Vector3 ndcminXYmaxZVertex = MakeTransform({ 0,0,0 }, minXYmaxZWorldViewProjectionMatrix);
+	Vector3 ndcminYZmaxXVertex = MakeTransform({ 0,0,0 }, minYZmaxXWorldViewProjectionMatrix);
+	Vector3 ndcminYmaxXZVertex = MakeTransform({ 0,0,0 }, minYmaxXZWorldViewProjectionMatrix);
 
-	Novice::DrawTriangle(static_cast<int>(screenVertices[0].x), static_cast<int>(screenVertices[0].y),
-		static_cast<int>(screenVertices[1].x), static_cast<int>(screenVertices[1].y),
-		static_cast<int>(screenVertices[2].x), static_cast<int>(screenVertices[2].y), color, kFillModeWireFrame);
+	// スクリーン座標系
+	Vector3 screenminXYZ = MakeTransform(ndcminXYZVertex, viewportmatrx);
+	Vector3 screenminXYmaxZ = MakeTransform(ndcminXYmaxZVertex, viewportmatrx);
+	Vector3 screenminYZmaxX = MakeTransform(ndcminYZmaxXVertex, viewportmatrx);
+	Vector3 screenminYmaxXZ = MakeTransform(ndcminYmaxXZVertex, viewportmatrx);
+
+
+
+
+	Vector3 maxXYZ = aabb.max;
+	Vector3 maxXYminZ = { aabb.max.x,aabb.max.y,aabb.min.z };
+	Vector3 maxYZminX = { aabb.min.x,aabb.max.y,aabb.max.z };
+	Vector3 maxYminXZ = { aabb.min.x,aabb.max.y,aabb.min.z };
+
+	// ワールド座標系
+	Matrix4x4 maxXYZWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, maxXYZ);
+	Matrix4x4 maxXYminZWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, maxXYminZ);
+	Matrix4x4 maxYZminXWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, maxYZminX);
+	Matrix4x4 maxYminXZWorldMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, maxYminXZ);
+
+	// 同時クリップ空間
+	Matrix4x4 maxXYZWorldViewProjectionMatrix = MatrixFunction::Multiply(maxXYZWorldMatrix, viewProjectionMatrix);
+	Matrix4x4 maxXYminZWorldViewProjectionMatrix = MatrixFunction::Multiply(maxXYminZWorldMatrix, viewProjectionMatrix);
+	Matrix4x4 maxYZminXWorldViewProjectionMatrix = MatrixFunction::Multiply(maxYZminXWorldMatrix, viewProjectionMatrix);
+	Matrix4x4 maxYminXZWorldViewProjectionMatrix = MatrixFunction::Multiply(maxYminXZWorldMatrix, viewProjectionMatrix);
+
+	// 正規化デバイス座標系
+	Vector3 ndcmaxXYZVertex = MakeTransform({ 0,0,0 }, maxXYZWorldViewProjectionMatrix);
+	Vector3 ndcmaxXYminZVertex = MakeTransform({ 0,0,0 }, maxXYminZWorldViewProjectionMatrix);
+	Vector3 ndcmaxYZminXVertex = MakeTransform({ 0,0,0 }, maxYZminXWorldViewProjectionMatrix);
+	Vector3 ndcmaxYminXZVertex = MakeTransform({ 0,0,0 }, maxYminXZWorldViewProjectionMatrix);
+
+	// スクリーン座標系
+	Vector3 screenmaxXYZ = MakeTransform(ndcmaxXYZVertex, viewportmatrx);
+	Vector3 screenmaxXYminZ = MakeTransform(ndcmaxXYminZVertex, viewportmatrx);
+	Vector3 screenmaxYZminX = MakeTransform(ndcmaxYZminXVertex, viewportmatrx);
+	Vector3 screenmaxYminXZ = MakeTransform(ndcmaxYminXZVertex, viewportmatrx);
+
+	Novice::DrawLine(static_cast<int>(screenminXYZ.x), static_cast<int>(screenminXYZ.y), static_cast<int>(screenminXYmaxZ.x), static_cast<int>(screenminXYmaxZ.y), color);
+	Novice::DrawLine(static_cast<int>(screenminXYZ.x), static_cast<int>(screenminXYZ.y), static_cast<int>(screenminYZmaxX.x), static_cast<int>(screenminYZmaxX.y), color);
+	Novice::DrawLine(static_cast<int>(screenminXYZ.x), static_cast<int>(screenminXYZ.y), static_cast<int>(screenmaxYminXZ.x), static_cast<int>(screenmaxYminXZ.y), color);//
+
+	Novice::DrawLine(static_cast<int>(screenmaxYZminX.x), static_cast<int>(screenmaxYZminX.y), static_cast<int>(screenmaxYminXZ.x), static_cast<int>(screenmaxYminXZ.y), color);//
+	Novice::DrawLine(static_cast<int>(screenmaxYZminX.x), static_cast<int>(screenmaxYZminX.y), static_cast<int>(screenminXYmaxZ.x), static_cast<int>(screenminXYmaxZ.y), color);//
+	Novice::DrawLine(static_cast<int>(screenmaxYZminX.x), static_cast<int>(screenmaxYZminX.y), static_cast<int>(screenmaxXYZ.x), static_cast<int>(screenmaxXYZ.y), color);//
+
+	Novice::DrawLine(static_cast<int>(screenminYmaxXZ.x), static_cast<int>(screenminYmaxXZ.y), static_cast<int>(screenminXYmaxZ.x), static_cast<int>(screenminXYmaxZ.y), color);//
+	Novice::DrawLine(static_cast<int>(screenminYmaxXZ.x), static_cast<int>(screenminYmaxXZ.y), static_cast<int>(screenmaxXYZ.x), static_cast<int>(screenmaxXYZ.y), color);//
+	Novice::DrawLine(static_cast<int>(screenminYmaxXZ.x), static_cast<int>(screenminYmaxXZ.y), static_cast<int>(screenminYZmaxX.x), static_cast<int>(screenminYZmaxX.y), color);//
+
+	Novice::DrawLine(static_cast<int>(screenmaxXYminZ.x), static_cast<int>(screenmaxXYminZ.y), static_cast<int>(screenmaxXYZ.x), static_cast<int>(screenmaxXYZ.y), color);//
+	Novice::DrawLine(static_cast<int>(screenmaxXYminZ.x), static_cast<int>(screenmaxXYminZ.y), static_cast<int>(screenminYZmaxX.x), static_cast<int>(screenminYZmaxX.y), color);
+	Novice::DrawLine(static_cast<int>(screenmaxXYminZ.x), static_cast<int>(screenmaxXYminZ.y), static_cast<int>(screenmaxYminXZ.x), static_cast<int>(screenmaxYminXZ.y), color);
 }
 
 bool IsCollision(const Sphere& s1, const Sphere& s2)
@@ -278,8 +335,8 @@ bool IsCollision(const Sphere& s1, const Sphere& s2)
 	if (distance <= s1.radius + s2.radius)
 	{
 		return true;
-	} 
-	else if(distance > s1.radius + s2.radius)
+	}
+	else if (distance > s1.radius + s2.radius)
 	{
 		return false;
 	}
@@ -289,7 +346,7 @@ bool IsCollision(const Sphere& s1, const Sphere& s2)
 	}
 }
 
-bool SpherePlaneCollision( Sphere& sphere, const Plane& plane) {
+bool SpherePlaneCollision(Sphere& sphere, const Plane& plane) {
 	float distance = ((plane.normal.x * sphere.center.x) + (plane.normal.y * sphere.center.y) + (plane.normal.z * sphere.center.z)) - plane.distance;
 
 	float absoluteRadius = Absolute(sphere.radius);
@@ -305,16 +362,11 @@ bool SpherePlaneCollision( Sphere& sphere, const Plane& plane) {
 	}
 }
 
-bool segmentPlaneCollision(const Segment& segment, const Plane& plane) {
-	float dot = Dot(plane.normal, segment.diff);
+bool AABBtoAABBCollision(AABB& a, AABB b) {
+	if ((a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+		(a.min.y <= b.max.y && a.max.y >= b.min.y) &&
+		(a.min.z <= b.max.z && a.max.z >= b.min.z)) {
 
-	if (dot == 0.0f) {
-		return false;
-	}
-
-	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
-
-	if (0 <= t && t <= 1) {
 		return true;
 	}
 	else {
@@ -332,15 +384,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Vector3 cameraRotate{ 0.26F,0.0F,0.0F };
 
-	uint32_t segmentcolor = WHITE;;
+	AABB aabb1 = {};
+	AABB aabb2 = {};
 
-	Segment segment = {};
-
-	Triangle triangle{};
+	uint32_t AABB1Color = WHITE;
+	uint32_t AABB2Color = WHITE;
 
 	// キー入力結果を受け取る箱
-	char keys[256] = {0};
-	char preKeys[256] = {0};
+	char keys[256] = { 0 };
+	char preKeys[256] = { 0 };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -354,17 +406,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 		/// ↓更新処理ここから
 		///
-		
+
 		ImGui::Begin("Window");
 		ImGui::DragFloat3("CameraTranslate", &cameraTranslate.x, 0.01f);
 		ImGui::DragFloat3("CameraRotate", &cameraRotate.x, 0.01f);
-		ImGui::DragFloat3("Segment.origin", &segment.origin.x,0.01f);
-		ImGui::DragFloat3("Segment.diff", &segment.diff.x,0.01f);
-		ImGui::DragFloat3("vertices[0]", &triangle.vertices[0].x, 0.01f);
-		ImGui::DragFloat3("vertices[1]", &triangle.vertices[1].x, 0.01f);
-		ImGui::DragFloat3("vertices[2]", &triangle.vertices[2].x, 0.01f);
+		ImGui::DragFloat3("AABB1.min", &aabb1.min.x, 0.1f);
+		ImGui::DragFloat3("AABB1.max", &aabb1.max.x, 0.1f);
+		ImGui::DragFloat3("AABB2.min", &aabb2.min.x, 0.1f);
+		ImGui::DragFloat3("AABB2.max", &aabb2.max.x, 0.1f);
 		ImGui::End();
-		
+
 
 		Matrix4x4 cameraMatrix = MatrixFunction::MakeAffineMatrix({ 1.0f, 1.0f,1.0f }, cameraRotate, cameraTranslate);
 
@@ -376,51 +427,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		Matrix4x4 viewProjectionMatrix = MatrixFunction::Multiply(viewMatrix, projectionMatrix);
 
-		Vector3 v1 = Subtract(triangle.vertices[1], triangle.vertices[0]);
-
-		Vector3 v2 = Subtract(triangle.vertices[2], triangle.vertices[1]);
-
-		Vector3 v = Cross(v1, v2);
-
-		v = Normalize(v);
-
-		float d = Dot(triangle.vertices[0], v);
-
-		Plane trianglePlane = { v,d };
-		
-		float DOT = Dot(trianglePlane.normal, segment.diff);
-
-		float T = (trianglePlane.distance - Dot(segment.origin, trianglePlane.normal)) / DOT;
-		
-		Vector3 p = Add(segment.origin, { segment.diff.x * T,segment.diff.y * T,segment.diff.z * T });
-
-		if (segmentPlaneCollision(segment, trianglePlane))
-		{
-			Vector3 v01 = Subtract(triangle.vertices[0], triangle.vertices[1]);
-			Vector3 v12 = Subtract(triangle.vertices[1], triangle.vertices[2]);
-			Vector3 v20 = Subtract(triangle.vertices[2], triangle.vertices[0]);
-
-			Vector3 v0p = Subtract(triangle.vertices[0], p);
-			Vector3 v1p = Subtract(triangle.vertices[1], p);
-			Vector3 v2p = Subtract(triangle.vertices[2], p);
-
-			Vector3 cross01 = Cross(v01, v1p);
-			Vector3 cross12 = Cross(v12, v2p);
-			Vector3 cross20 = Cross(v20, v0p);
-
-			if (Dot(cross01, trianglePlane.normal) >= 0.0f &&
-				Dot(cross12, trianglePlane.normal) >= 0.0f &&
-				Dot(cross20, trianglePlane.normal) >= 0.0f) {
-				segmentcolor = RED;
-			}
-			else {
-				segmentcolor = WHITE;
-			}
+		if (AABBtoAABBCollision(aabb1, aabb2)) {
+			AABB1Color = RED;
+			AABB2Color = RED;
 		}
 		else {
-			segmentcolor = WHITE;
+			AABB1Color = WHITE;
+			AABB2Color = WHITE;
 		}
-		
+
 		///
 		/// ↑更新処理ここまで
 		///
@@ -431,9 +446,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		DrawGrid(viewProjectionMatrix, viewportMatrix);
 
-		DrawSegment(segment, viewProjectionMatrix, viewportMatrix, segmentcolor);
-
-		DrawTriangle(triangle, viewProjectionMatrix, viewportMatrix,WHITE);
+		DrawAABB(aabb1, viewProjectionMatrix, viewportMatrix, AABB1Color);
+		DrawAABB(aabb2, viewProjectionMatrix, viewportMatrix, AABB2Color);
 
 		///
 		/// ↑描画処理ここまで
