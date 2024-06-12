@@ -432,7 +432,7 @@ bool AABBSegmentCollision(AABB aabb, Segment segment)
 
 	float tMax = min(min(tFarX, tFarY), tFarZ);
 
-	if (tMin <= tMax) {
+	if (tMin <= 1 && tMin <= tMax && tMax >= 0) {
 		return true;
 	}
 	else {
@@ -450,9 +450,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Vector3 cameraRotate{ 0.26F,0.0F,0.0F };
 
-	AABB aabb1 = {};
+	AABB aabb1 = {
+		{-0.5f,-0.5f,-0.5f},
+		{0.5f,0.5f,0.5f}
+	};
 
-	Segment segment = {};
+	Segment segment = {
+		{-0.7f,0.3f,0.0f},
+		{2.0f,-0.5f,0.0f}
+	};
 
 	uint32_t segmentColor = WHITE;
 
